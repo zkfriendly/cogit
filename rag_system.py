@@ -1,65 +1,69 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
+from langchain.llms import Ollama
+from langchain.embeddings import OllamaEmbeddings
+from langchain.vectorstores import FAISS
+from langchain.chains import RetrievalQA
 from github_fetcher import fetch_github_data
 import numpy as np
 
 # Initialize models
 def initialize_models():
     print("Initializing models...")
-    model_name = "ibm-granite/granite-3b-code-instruct"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(model_name)
-    sentence_model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
-    return tokenizer, model, sentence_model
+    llm = Ollama(model="llama3.1")
+    embeddings = OllamaEmbeddings(model="llama3.1")
+    return llm, embeddings
 
 # Global variables for models
-tokenizer, model, sentence_model = None, None, None
+llm, embeddings = None, None
 
-def retrieve_relevant_docs(query, documents, top_k=3):
-    query_embedding = sentence_model.encode([query])
-    doc_embeddings = sentence_model.encode(documents)
-    similarities = cosine_similarity(query_embedding, doc_embeddings)[0]
-    top_indices = np.argsort(similarities)[-top_k:][::-1]
-    return [documents[i] for i in top_indices]
+def create_vectorstore(documents):
+    return FAISS.from_texts(documents, embeddings)
 
-def rag_generate(query, documents):
-    print("Retrieving relevant documents...")
-    relevant_docs = retrieve_relevant_docs(query, documents)
-    print(f"Number of relevant documents: {len(relevant_docs)}")
-
-    context = "\n".join(relevant_docs[:3])  # Limit context to first 3 relevant documents
-    prompt = f"Context:\n{context}\n\nQuery: {query}\n\nResponse:"
-    print("Generated prompt (truncated):", prompt[:100] + "...")
-
-    print("Tokenizing input...")
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=1024)
-    print("Generating response...")
-    outputs = model.generate(**inputs, max_length=200)
-    print("Decoding response...")
-    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
+def rag_generate(query, vectorstore):
+    print("Retrieving relevant documents and generating response...")
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=vectorstore.as_retriever(search_kwargs={"k": 3})
+    )
+    response = qa_chain.run(query)
     return response
+
 if __name__ == "__main__":
+    print("\n" + "="*50)
     print("Starting RAG system...")
+    print("="*50 + "\n")
     try:
         # Initialize models
-        tokenizer, model, sentence_model = initialize_models()
+        llm, embeddings = initialize_models()
+        print("\n" + "-"*50)
         print("Models initialized successfully.")
+        print("-"*50 + "\n")
+
         repo_name = "semaphore-protocol/semaphore"  # Replace with the actual GitHub repository name
         documents = fetch_github_data(repo_name)
-        print("Documents fetched successfully.")
+        vectorstore = create_vectorstore(documents)
+        print("\n" + "-"*50)
+        print("Documents fetched and vectorstore created successfully.")
         print(f"Number of documents: {len(documents)}")
+        print("-"*50 + "\n")
         
         while True:
             query = input("Enter your query (or 'quit' to exit): ")
             if query.lower() == 'quit':
+                print("\n" + "="*50)
                 print("Exiting the RAG system. Goodbye!")
+                print("="*50 + "\n")
                 break
             
+            print("\n" + "*"*50)
             print("Query:", query)
-            result = rag_generate(query, documents)
-            print("Response:", result)
-            print("\n" + "-"*50 + "\n")
+            print("*"*50)
+            result = rag_generate(query, vectorstore)
+            print("\n" + "*"*50)
+            print("Response:")
+            print(result)
+            print("*"*50 + "\n")
     except Exception as e:
+        print("\n" + "!"*50)
         print(f"An error occurred: {str(e)}")
+        print("!"*50 + "\n")
