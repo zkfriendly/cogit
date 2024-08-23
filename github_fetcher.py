@@ -6,7 +6,7 @@ import json
 import time
 
 def fetch_github_data(repo_name, use_cache=True, cache_expiry=86400):  # 86400 seconds = 24 hours
-    cache_file = f"{repo_name.replace('/', '_')}_cache.json"
+    cache_file = f"data/{repo_name.replace('/', '_')}_cache.json"
     
     if use_cache and os.path.exists(cache_file):
         # Check if cache is still valid

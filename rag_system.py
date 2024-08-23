@@ -7,10 +7,10 @@ import numpy as np
 # Initialize models
 def initialize_models():
     print("Initializing models...")
-    model_name = "ibm-granite/granite-34b-code-instruct"
+    model_name = "ibm-granite/granite-3b-code-instruct"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(model_name)
-    sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
+    sentence_model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
     return tokenizer, model, sentence_model
 
 # Global variables for models
@@ -40,23 +40,26 @@ def rag_generate(query, documents):
     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
     return response
-
 if __name__ == "__main__":
     print("Starting RAG system...")
     try:
         # Initialize models
         tokenizer, model, sentence_model = initialize_models()
-
-        # repo_name = "semaphore-protocol/semaphore"  # Replace with the actual GitHub repository name
-        # documents = fetch_github_data(repo_name)
+        print("Models initialized successfully.")
+        repo_name = "semaphore-protocol/semaphore"  # Replace with the actual GitHub repository name
+        documents = fetch_github_data(repo_name)
+        print("Documents fetched successfully.")
+        print(f"Number of documents: {len(documents)}")
         
-        # print(documents)
-        
-        # query = input("Enter your query: ")
-        # print("Query:", query)
-        # print(f"Number of documents: {len(documents)}")
-        
-        # result = rag_generate(query, documents)
-        # print("Final result:", result)
+        while True:
+            query = input("Enter your query (or 'quit' to exit): ")
+            if query.lower() == 'quit':
+                print("Exiting the RAG system. Goodbye!")
+                break
+            
+            print("Query:", query)
+            result = rag_generate(query, documents)
+            print("Response:", result)
+            print("\n" + "-"*50 + "\n")
     except Exception as e:
         print(f"An error occurred: {str(e)}")
