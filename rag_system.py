@@ -1,15 +1,20 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+from github_fetcher import fetch_github_data
 import numpy as np
 
-# Initialize LLM
-model_name = "gpt2"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name)
+# Initialize models
+def initialize_models():
+    print("Initializing models...")
+    model_name = "ibm-granite/granite-34b-code-instruct"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+    sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
+    return tokenizer, model, sentence_model
 
-# Initialize sentence transformer
-sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
+# Global variables for models
+tokenizer, model, sentence_model = None, None, None
 
 def retrieve_relevant_docs(query, documents, top_k=3):
     query_embedding = sentence_model.encode([query])
@@ -21,14 +26,14 @@ def retrieve_relevant_docs(query, documents, top_k=3):
 def rag_generate(query, documents):
     print("Retrieving relevant documents...")
     relevant_docs = retrieve_relevant_docs(query, documents)
-    print("Relevant documents:", relevant_docs)
+    print(f"Number of relevant documents: {len(relevant_docs)}")
 
-    context = "\n".join(relevant_docs)
+    context = "\n".join(relevant_docs[:3])  # Limit context to first 3 relevant documents
     prompt = f"Context:\n{context}\n\nQuery: {query}\n\nResponse:"
-    print("Generated prompt:", prompt)
+    print("Generated prompt (truncated):", prompt[:100] + "...")
 
     print("Tokenizing input...")
-    inputs = tokenizer(prompt, return_tensors="pt")
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=1024)
     print("Generating response...")
     outputs = model.generate(**inputs, max_length=200)
     print("Decoding response...")
@@ -36,21 +41,22 @@ def rag_generate(query, documents):
 
     return response
 
-# Ensure the script is being run as the main program
 if __name__ == "__main__":
     print("Starting RAG system...")
     try:
-        documents = [
-            "Python is a high-level programming language.",
-            "JavaScript is commonly used for web development.",
-            "Machine learning involves training models on data."
-        ]
+        # Initialize models
+        tokenizer, model, sentence_model = initialize_models()
 
-        query = "What is Python used for?"
-        print("Query:", query)
-        print("Documents:", documents)
-
-        result = rag_generate(query, documents)
-        print("Final result:", result)
+        # repo_name = "semaphore-protocol/semaphore"  # Replace with the actual GitHub repository name
+        # documents = fetch_github_data(repo_name)
+        
+        # print(documents)
+        
+        # query = input("Enter your query: ")
+        # print("Query:", query)
+        # print(f"Number of documents: {len(documents)}")
+        
+        # result = rag_generate(query, documents)
+        # print("Final result:", result)
     except Exception as e:
         print(f"An error occurred: {str(e)}")
